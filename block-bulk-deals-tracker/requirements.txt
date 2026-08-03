@@ -1,6 +1,0 @@
-fastapi==0.121.2
-uvicorn[standard]==0.41.0
-curl_cffi==0.15.0
-openpyxl==3.1.5
-reportlab==5.0.0
-pydantic==2.12.4
