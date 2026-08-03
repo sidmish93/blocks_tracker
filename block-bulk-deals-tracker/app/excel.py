@@ -1,0 +1,140 @@
+import io
+from datetime import date
+
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
+
+MONEY = "#,##0.00"
+WHOLE = "#,##0"
+PERCENT = "0.00"
+
+DEAL_COLUMNS = [
+    ("Company Name", "company_name", 34, None),
+    ("Trade Date", "trade_date_iso", 13, "DD-MMM-YYYY"),
+    ("Year", "year", 7, None),
+    ("Ticker", "ticker", 13, None),
+    ("Quantity Traded", "quantity", 16, WHOLE),
+    ("Trade Price / Wtd. Avg. Price", "price", 22, None),
+    ("Deal Size (Rs cr)", "deal_size_cr", 15, MONEY),
+    ("Type", "deal_type", 20, None),
+    ("Sellers", "sellers", 60, None),
+    ("Buyers", "buyers", 60, None),
+    ("Exchange", "exchange", 12, None),
+]
+
+MARKET_COLUMNS = [
+    ("Company Name", "company_name", 34, None),
+    ("Ticker", "ticker", 13, None),
+    ("As Of", "as_of", 13, "DD-MMM-YYYY"),
+    ("Close (Rs)", "close", 12, MONEY),
+    ("Market Cap (Rs cr)", "market_cap_cr", 17, MONEY),
+    ("Return 1D (%)", "return_1d_pct", 13, PERCENT),
+    ("Return 1W (%)", "return_1w_pct", 13, PERCENT),
+    ("Return 1M (%)", "return_1m_pct", 13, PERCENT),
+    ("ADTV 1D (Rs cr)", "adtv_1d_cr", 15, MONEY),
+    ("ADTV 1W (Rs cr)", "adtv_1w_cr", 15, MONEY),
+    ("ADTV 1M (Rs cr)", "adtv_1m_cr", 15, MONEY),
+    ("VWAP 1D (Rs)", "vwap_1d", 13, MONEY),
+    ("VWAP 1W (Rs)", "vwap_1w", 13, MONEY),
+    ("VWAP 1M (Rs)", "vwap_1m", 13, MONEY),
+    ("Delivery 1D (%)", "delivery_1d_pct", 15, PERCENT),
+    ("Delivery 1W (%)", "delivery_1w_pct", 15, PERCENT),
+    ("Delivery 1M (%)", "delivery_1m_pct", 15, PERCENT),
+]
+
+NEWS_COLUMNS = [
+    ("Company Name", "company_name", 34, None),
+    ("Source", "source", 18, None),
+    ("Published", "published_display", 17, None),
+    ("Headline", "headline", 90, None),
+    ("Link", "url", 60, None),
+]
+
+HEADER_FILL = PatternFill("solid", fgColor="1F2937")
+HEADER_FONT = Font(color="FFFFFF", bold=True, size=10)
+LINK_FONT = Font(color="1155CC", underline="single")
+
+
+def _as_date(value):
+    try:
+        return date.fromisoformat(value)
+    except (TypeError, ValueError):
+        return value
+
+
+def _write_sheet(sheet, columns, records) -> None:
+    sheet.append([title for title, _, _, _ in columns])
+    for index, (_, _, width, _) in enumerate(columns, start=1):
+        letter = get_column_letter(index)
+        sheet.column_dimensions[letter].width = width
+        cell = sheet.cell(row=1, column=index)
+        cell.fill = HEADER_FILL
+        cell.font = HEADER_FONT
+        cell.alignment = Alignment(vertical="center", wrap_text=True)
+    sheet.row_dimensions[1].height = 30
+
+    for record in records:
+        values = []
+        for _, field, _, number_format in columns:
+            value = record.get(field)
+            values.append(_as_date(value) if number_format == "DD-MMM-YYYY" else value)
+        sheet.append(values)
+
+    last_row = sheet.max_row
+    for row_index in range(2, last_row + 1):
+        for index, (_, _, _, number_format) in enumerate(columns, start=1):
+            if number_format:
+                sheet.cell(row=row_index, column=index).number_format = number_format
+
+    sheet.freeze_panes = "A2"
+    if last_row > 1:
+        sheet.auto_filter.ref = f"A1:{get_column_letter(len(columns))}{last_row}"
+
+
+def _news_records(articles):
+    records = []
+    for article in articles:
+        record = dict(article)
+        published = article.get("published") or ""
+        record["published_display"] = published.replace("T", " ")[:16]
+        records.append(record)
+    return records
+
+
+def _write_news(sheet, articles) -> None:
+    _write_sheet(sheet, NEWS_COLUMNS, _news_records(articles))
+    headline_column = 1 + [field for _, field, _, _ in NEWS_COLUMNS].index("headline")
+    link_column = 1 + [field for _, field, _, _ in NEWS_COLUMNS].index("url")
+
+    for row_index, article in enumerate(articles, start=2):
+        url = article.get("url")
+        if not url:
+            continue
+        for column in (headline_column, link_column):
+            cell = sheet.cell(row=row_index, column=column)
+            cell.hyperlink = url
+            cell.font = LINK_FONT
+
+
+def build_workbook(rows, market_data=None, articles=None) -> bytes:
+    workbook = Workbook()
+
+    deals = workbook.active
+    deals.title = "Block & Bulk Deals"
+    _write_sheet(deals, DEAL_COLUMNS, rows)
+    for row_index in range(2, deals.max_row + 1):
+        for column_index in (9, 10):
+            deals.cell(row=row_index, column=column_index).alignment = Alignment(
+                wrap_text=True, vertical="top"
+            )
+
+    if market_data:
+        _write_sheet(workbook.create_sheet("Market Data"), MARKET_COLUMNS, market_data)
+
+    if articles:
+        _write_news(workbook.create_sheet("News"), articles)
+
+    stream = io.BytesIO()
+    workbook.save(stream)
+    return stream.getvalue()
