@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Block &amp; Bulk Deals Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <h1>Block &amp; Bulk Deals Tracker</h1>
+      <p>Consolidated NSE and BSE disclosures, aggregated by company and trade date.</p>
+    </header>
+
+    <main>
+      <form id="controls" class="panel">
+        <div class="row">
+          <div class="field grow">
+            <label for="company">Company <span class="label-hint">separate several with ;</span></label>
+            <div class="combo">
+              <input
+                type="text"
+                id="company"
+                autocomplete="off"
+                placeholder="All companies - or name a few, e.g. Delhivery; Lodha; Vedanta"
+              />
+              <button type="button" id="clear-company" class="clear" hidden aria-label="Clear companies">
+                &times;
+              </button>
+              <ul id="suggestions" class="suggestions" hidden></ul>
+            </div>
+            <div id="company-chosen" class="chips" hidden></div>
+          </div>
+
+          <div class="field">
+            <label for="min-size">Minimum deal size (Rs cr)</label>
+            <input type="number" id="min-size" value="200" min="0" step="1" required />
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label>Period</label>
+            <div class="segmented" role="group">
+              <button type="button" id="mode-range" class="segment active" aria-pressed="true">
+                Custom range
+              </button>
+              <button type="button" id="mode-listing" class="segment" aria-pressed="false">
+                Since listing
+              </button>
+            </div>
+          </div>
+
+          <div class="field" id="range-fields">
+            <label for="from-date">From</label>
+            <input type="date" id="from-date" />
+          </div>
+          <div class="field" id="range-fields-to">
+            <label for="to-date">To</label>
+            <input type="date" id="to-date" />
+          </div>
+
+          <p id="listing-note" class="hint listing" hidden></p>
+
+          <div class="actions">
+            <button type="submit" id="generate" class="primary">Generate tracker</button>
+            <button type="button" id="download" class="secondary" disabled>Download Excel</button>
+            <button type="button" id="download-pdf" class="secondary" disabled>Download PDF</button>
+          </div>
+        </div>
+      </form>
+
+      <p id="status" class="status" role="status"></p>
+
+      <section id="picker" class="picker" hidden>
+        <p id="picker-message"></p>
+        <ul id="picker-list"></ul>
+      </section>
+
+      <section id="summary" class="summary" hidden></section>
+
+      <section id="market" class="results" hidden>
+        <div class="section-head">
+          <h2>Market data</h2>
+          <p id="market-note"></p>
+          <button type="button" class="copy" data-copy-table="#market-table">Copy table</button>
+        </div>
+        <div class="table-scroll short">
+          <table id="market-table" class="grouped">
+            <thead>
+              <tr>
+                <th rowspan="2">Company</th>
+                <th rowspan="2">Ticker</th>
+                <th rowspan="2">As Of</th>
+                <th class="numeric" rowspan="2">Close (Rs)</th>
+                <th class="numeric" rowspan="2">Market Cap (Rs cr)</th>
+                <th class="numeric group" colspan="3">Return (%)</th>
+                <th class="numeric group" colspan="3">ADTV (Rs cr)</th>
+                <th class="numeric group" colspan="3">VWAP (Rs)</th>
+                <th class="numeric group" colspan="3">Delivery (%)</th>
+              </tr>
+              <tr>
+                <th class="numeric sub group">1D</th>
+                <th class="numeric sub">1W</th>
+                <th class="numeric sub">1M</th>
+                <th class="numeric sub group">1D</th>
+                <th class="numeric sub">1W</th>
+                <th class="numeric sub">1M</th>
+                <th class="numeric sub group">1D</th>
+                <th class="numeric sub">1W</th>
+                <th class="numeric sub">1M</th>
+                <th class="numeric sub group">1D</th>
+                <th class="numeric sub">1W</th>
+                <th class="numeric sub">1M</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="quarters" class="results" hidden>
+        <div class="section-head">
+          <h2>Latest quarter</h2>
+          <p id="quarters-note"></p>
+          <button type="button" class="copy" data-copy-table="#quarters-table">Copy table</button>
+        </div>
+        <div class="table-scroll short">
+          <table id="quarters-table">
+            <thead>
+              <tr>
+                <th>Company</th>
+                <th>Quarter</th>
+                <th>Report</th>
+                <th>Key takeaways</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="news" class="results" hidden>
+        <div class="section-head">
+          <h2>News</h2>
+          <p id="news-note"></p>
+          <button type="button" class="copy" data-copy-table="#news-table">Copy table</button>
+        </div>
+        <div class="table-scroll short">
+          <table id="news-table">
+            <thead>
+              <tr>
+                <th>Company</th>
+                <th>Source</th>
+                <th>Published</th>
+                <th>Headline</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="results" class="results" hidden>
+        <div class="section-head">
+          <h2>Block &amp; bulk deals</h2>
+          <p id="deals-note"></p>
+          <button type="button" class="copy" data-copy-table="#deals">Copy table</button>
+        </div>
+        <div class="table-scroll">
+          <table id="deals" class="grouped">
+            <thead>
+              <tr>
+                <th rowspan="2">Company Name</th>
+                <th rowspan="2">Trade Date</th>
+                <th class="numeric" rowspan="2">Year</th>
+                <th rowspan="2">Ticker</th>
+                <th class="numeric" rowspan="2">Quantity Traded</th>
+                <th class="numeric" rowspan="2">Trade Price / Wtd. Avg.</th>
+                <th class="numeric" rowspan="2">Deal Size (Rs cr)</th>
+                <th class="numeric group" rowspan="2">Prev Close (Rs)</th>
+                <th class="numeric" rowspan="2">Discount (%)</th>
+                <th class="numeric group" colspan="4">Month before the deal</th>
+                <th rowspan="2">Type</th>
+                <th rowspan="2">Sellers</th>
+                <th rowspan="2">Buyers</th>
+                <th rowspan="2">Exchange</th>
+              </tr>
+              <tr>
+                <th class="numeric sub group">Return (%)</th>
+                <th class="numeric sub">ADTV (Rs cr)</th>
+                <th class="numeric sub">VWAP (Rs)</th>
+                <th class="numeric sub">Delivery (%)</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
